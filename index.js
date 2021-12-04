@@ -3,7 +3,7 @@
 const settings = require('./settings');
 const telegramBotApi = require("node-telegram-bot-api");
 
-const bot = new telegramBotApi(settings.token, {polling: true});
+const bot = new telegramBotApi(settings.telegramBotApi.token, {polling: true});
 
 const alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const numbers = "0123456789";
