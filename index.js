@@ -23,6 +23,7 @@ const emoji = {
     checkMark: "\u{2714}",
     uncheckMark: "\u{2716}",
     clappingHands: "\u{1F44F}",
+    upPointingHand: "\u{261D}",
 };
 
 
@@ -37,7 +38,7 @@ const start = (chatId) => {
                     {text: "Обычный пароль", callback_data: JSON.stringify({button: "generateRegularPasswd"})},
                 ],
                 [
-                    {text: "Кастомный пароль", callback_data: JSON.stringify({button: "createCustomPasswd", value: 4})},
+                    {text: "Кастомный пароль", callback_data: JSON.stringify({button: "prepareCustomPasswd", value: 4})},
                 ],
             ]
         })
@@ -47,26 +48,35 @@ const start = (chatId) => {
 
 
 // генерим пароль
-const generatePasswd = (lenght = 8, isNumbers = true, isSymbols = true) => {
+const generatePasswd = (lenght = 8, isAlpha = true, isNumbers = true, isSymbols = true) => {
     let passwd = "";
-    let characters = alpha;
+    let characters = "";
+    isAlpha ? (characters += alpha) : "";
     isNumbers ? (characters += numbers) : "";
     isSymbols ? (characters += symbols) : "";
+
     for (let i = 0; i < lenght; i++) {
         passwd += characters.charAt(
             Math.floor(Math.random() * characters.length)
         );
     }
+
+    if (isAlpha) {
+        const result = [...alpha].filter(value => passwd.includes(value));
+        if (!result.length) {
+            return generatePasswd(lenght, isAlpha, isNumbers, isSymbols);
+        }
+    }
     if (isNumbers) {
         const result = [...numbers].filter(value => passwd.includes(value));
         if (!result.length) {
-            return generatePasswd(lenght, isNumbers, isSymbols);
+            return generatePasswd(lenght, isAlpha, isNumbers, isSymbols);
         }
     }
     if (isSymbols) {
         const result = [...symbols].filter(value => passwd.includes(value));
         if (!result.length) {
-            return generatePasswd(lenght, isNumbers, isSymbols);
+            return generatePasswd(lenght, isAlpha, isNumbers, isSymbols);
         }
     }
     return passwd;
@@ -105,6 +115,27 @@ const repeatRegularPasswd = (chatId) => {
 };
 
 
+// генерим обычный пароль
+const generateCustomPasswd = async (chatId) => {
+    const { lenght, alpha, numbers, symbols } = customPasswdData;
+    if (alpha || numbers || symbols) {
+        let passwd, message;
+        const finishMessage = `Лови кастомные пароли ${emoji.flexedBiceps}`;
+        await bot.sendMessage(chatId, finishMessage, {parse_mode: "HTML"});
+        // создадим набор паролей
+        for (let i = 0; i < 4; i++) {
+            passwd = generatePasswd(lenght, alpha, numbers, symbols);
+            message = `<code>${passwd}</code>`;
+            await bot.sendMessage(chatId, message, {parse_mode: "HTML"});
+        }
+        repeatCustomPasswd(chatId);
+    } else {
+        const errorMessage = `Выбери что нибудь кроме длины ${emoji.upPointingHand}`;
+        await bot.sendMessage(chatId, errorMessage, {parse_mode: "HTML"});
+    }
+};
+
+
 // повторить вывод паролей
 const repeatCustomPasswd = (chatId) => {
     const message = `Создать еще паролей ${emoji.clappingHands}`;
@@ -113,7 +144,7 @@ const repeatCustomPasswd = (chatId) => {
         reply_markup: JSON.stringify({
             inline_keyboard: [
                 [
-                    {text: "Создать", callback_data: JSON.stringify({button: "generateCustomPasswd"})},
+                    {text: "Создать", callback_data: JSON.stringify({button: "createCustomPasswd"})},
                 ],
             ]
         })
@@ -142,6 +173,24 @@ const setCustomPasswdLenght = async (chatId) => {
                 [
                     {text: "16", callback_data: JSON.stringify({button: "lenght", value: 16})},
                 ]
+            ]
+        })
+    };
+    await bot.sendMessage(chatId, message, messageOptions);
+};
+
+
+// алфавит
+const setCustomPasswdAlpha = async (chatId) => {
+    const message = `Использовать в пароле алфавит\n<b>ABC...</b>`;
+    const messageOptions = {
+        parse_mode: "HTML",
+        reply_markup: JSON.stringify({
+            inline_keyboard: [
+                [
+                    {text: "Да", callback_data: JSON.stringify({button: "alpha", value: true})},
+                    {text: "Нет", callback_data: JSON.stringify({button: "alpha", value: false})},
+                ],
             ]
         })
     };
@@ -186,18 +235,19 @@ const setCustomPasswdSymbols = async (chatId) => {
 
 
 // генерим кастомный пароль
-const generateCustomPasswd = async (chatId) => {
+const createCustomPasswd = async (chatId) => {
     console.log("customPasswdData: ", customPasswdData);
     const lenghtMsg = `<b>${customPasswdData.lenght}</b> - длина пароля\n`;
+    const alphaMsg = customPasswdData.alpha ? `${emoji.checkMark} - алфавит\n` : `${emoji.uncheckMark} - алфавит\n`;
     const numbersMsg = customPasswdData.numbers ? `${emoji.checkMark} - числа\n` : `${emoji.uncheckMark} - числа\n`;
     const symbolsMsg = customPasswdData.symbols ? `${emoji.checkMark} - символы\n` : `${emoji.uncheckMark} - символы\n`;
-    const message = lenghtMsg + numbersMsg + symbolsMsg;
+    const message = lenghtMsg + alphaMsg + numbersMsg + symbolsMsg;
     const messageOptions = {
         parse_mode: "HTML",
         reply_markup: JSON.stringify({
             inline_keyboard: [
                 [
-                    {text: "Создать пароль", callback_data: JSON.stringify({button: "generateCustomPasswd", value: true})},
+                    {text: "Создать пароль", callback_data: JSON.stringify({button: "createCustomPasswd", value: true})},
                 ],
             ]
         })
@@ -243,7 +293,7 @@ bot.on('callback_query', async msg => {
         case "generateRegularPasswd":
             generateRegularPasswd(chatId);
             break;
-        case "createCustomPasswd":
+        case "prepareCustomPasswd":
             // обнуляем параметры кастомного пароля
             customPasswdData.lenght = null;
             customPasswdData.numbers = null;
@@ -253,6 +303,11 @@ bot.on('callback_query', async msg => {
             break;
         case "lenght":
             customPasswdData.lenght = data.value;
+            console.log("customPasswdData: ", customPasswdData);
+            setCustomPasswdAlpha(chatId);
+            break;
+        case "alpha":
+            customPasswdData.alpha = data.value;
             console.log("customPasswdData: ", customPasswdData);
             setCustomPasswdNumbers(chatId);
             break;
@@ -264,19 +319,10 @@ bot.on('callback_query', async msg => {
         case "symbols":
             customPasswdData.symbols = data.value;
             console.log("customPasswdData: ", customPasswdData);
-            generateCustomPasswd(chatId);
+            createCustomPasswd(chatId);
             break;
-        case "generateCustomPasswd":
-            let passwd, passwdMessage;
-            const finishMessage = `Лови кастомные пароли ${emoji.flexedBiceps}`;
-            await bot.sendMessage(chatId, finishMessage, {parse_mode: "HTML"});
-            // создадим набор паролей
-            for (let i = 0; i < 4; i++) {
-                passwd = generatePasswd(customPasswdData.lenght, customPasswdData.numbers, customPasswdData.symbols);
-                passwdMessage = `<code>${passwd}</code>`;
-                await bot.sendMessage(chatId, passwdMessage, {parse_mode: "HTML"});
-            }
-            repeatCustomPasswd(chatId);
+        case "createCustomPasswd":
+            generateCustomPasswd(chatId);
             break;
         default:
             break;
